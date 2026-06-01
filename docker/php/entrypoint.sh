@@ -30,8 +30,8 @@ fi
 # 3. Права на запись для MODX
 mkdir -p /var/www/html/core/cache /var/www/html/core/export
 chown -R www-data:www-data /var/www/html 2>/dev/null || true
-chmod -R 777 /var/www/html/core/cache /var/www/html/core/export 2>/dev/null || true
-find /var/www/html/assets -type d -name cache -exec chmod -R 777 {} + 2>/dev/null || true
+chmod -R 775 /var/www/html/core/cache /var/www/html/core/export 2>/dev/null || true
+find /var/www/html/assets -type d -name cache -exec chmod -R 775 {} + 2>/dev/null || true
 
 # 4. Запуск: php-fpm в фоне, nginx на переднем плане
 php-fpm -D

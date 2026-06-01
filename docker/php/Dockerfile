@@ -3,6 +3,7 @@ FROM php:8.3-fpm
 # Nginx + системные зависимости + envsubst (gettext-base) для подстановки ${S3_BUCKET}
 RUN apt-get update && apt-get install -y \
     nginx \
+    curl \
     gettext-base \
     libpng-dev libjpeg-dev libwebp-dev \
     libzip-dev libxml2-dev libonig-dev libicu-dev \
