@@ -1,0 +1,88 @@
+services:
+  # ── MODX: nginx + php-fpm в одном контейнере ─────────────────────────────
+  app:
+    build: ./docker/php
+    container_name: modx-app
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./modx:/var/www/html               # сюда вы кладёте MODX (см. README)
+      - imgproxy_cache:/var/cache/imgproxy  # кеш обработанных картинок (nginx proxy_cache)
+    tmpfs:
+      - /var/www/html/core/cache:uid=33,gid=33   # кеш MODX в памяти, не на диске
+    env_file: .env
+    environment:
+      SITE_URL: ${SITE_URL:-http://localhost:8080/}
+      S3_BUCKET: ${S3_BUCKET}
+      TABLE_PREFIX: ${TABLE_PREFIX}
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+      imgproxy:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── imgproxy: ресайз + WebP/AVIF на лету, читает оригиналы из S3 ──────────
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    container_name: modx-imgproxy
+    environment:
+      IMGPROXY_USE_S3: "true"
+      IMGPROXY_S3_ENDPOINT: ${IMGPROXY_S3_ENDPOINT}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_REGION: ${S3_REGION}
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_AUTO_AVIF: "true"
+      IMGPROXY_MAX_SRC_RESOLUTION: 50
+      IMGPROXY_ALLOWED_SOURCES: "s3://,https://"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ── MySQL ────────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8
+    container_name: modx-db
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    command: ["--innodb_buffer_pool_size=128M", "--max_connections=50"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # ── phpMyAdmin (удобно при установке MODX; можно убрать) ─────────────────
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: modx-pma
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  imgproxy_cache:

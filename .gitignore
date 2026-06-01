@@ -1,0 +1,13 @@
+# Секреты
+.env
+
+# MODX (скачиваете сами — в репо не коммитим)
+/modx/*
+!/modx/.gitkeep
+
+# init-дампы БД
+/docker/mysql/*
+!/docker/mysql/.gitkeep
+
+# Прочее
+.DS_Store
