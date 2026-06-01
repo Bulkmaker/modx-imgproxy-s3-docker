@@ -1,0 +1,43 @@
+# Минимальный Traefik v3 для прода: ingress на 80/443, авто-TLS Let's Encrypt.
+# Это пример «с нуля» — если Traefik у вас уже есть, используйте его.
+#
+# Подготовка (один раз):
+#   docker network create web
+#   cp ../.env.example .env   # и задайте ACME_EMAIL=you@example.com
+#   docker compose up -d
+#
+# После этого поднимайте сайт прод-оверлеем (см. корневой README).
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # http → https
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # Let's Encrypt (TLS-ALPN challenge)
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - web
+
+volumes:
+  traefik_letsencrypt:
+
+networks:
+  web:
+    external: true

@@ -1,0 +1,46 @@
+# Прод-оверлей: ingress через Traefik с TLS (Let's Encrypt), без публикации портов.
+#
+# Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Требуется:
+#   • запущенный Traefik с certresolver `letsencrypt` (минимальный пример — папка traefik/)
+#   • внешняя docker-сеть `web`:  docker network create web
+#   • в .env задан DOMAIN=ваш-домен.ru
+#
+# `!reset []` убирает публикацию портов из базового compose (нужен Docker Compose v2.24+);
+# на старых версиях просто удалите блоки ports из docker-compose.yml вручную.
+
+services:
+  app:
+    ports: !reset []
+    networks:
+      - default
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.modx.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.modx.entrypoints=websecure"
+      - "traefik.http.routers.modx.tls.certresolver=letsencrypt"
+      - "traefik.http.services.modx.loadbalancer.server.port=80"
+      # www → без www (раскомментируйте при необходимости)
+      # - "traefik.http.routers.modx-www.rule=Host(`www.${DOMAIN}`)"
+      # - "traefik.http.routers.modx-www.entrypoints=websecure"
+      # - "traefik.http.routers.modx-www.tls.certresolver=letsencrypt"
+      # - "traefik.http.routers.modx-www.middlewares=www-redirect"
+      # - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https://www\\.(.*)"
+      # - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://$${1}"
+      # - "traefik.http.middlewares.www-redirect.redirectregex.permanent=true"
+
+  # БД наружу в проде не публикуем (доступ — через docker exec / SSH-туннель)
+  db:
+    ports: !reset []
+
+  # phpMyAdmin наружу в проде не светим
+  phpmyadmin:
+    ports: !reset []
+
+networks:
+  web:
+    external: true
